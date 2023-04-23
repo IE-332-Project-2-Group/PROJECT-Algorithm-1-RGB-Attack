@@ -1,0 +1,49 @@
+library(tidyverse)
+library(keras)
+library(tensorflow)
+library(reticulate)
+library(png)
+
+setwd("C:/Users/T A/OneDrive - purdue.edu")
+
+model_list <- load_model_tf("./dandelion_model")
+model <- model_list
+
+target_size <- c(224, 224)
+res <- data.frame(file = character(), class = character(), percent_dandelion = numeric(), percent_grass = numeric(), stringsAsFactors = FALSE)
+
+f <- list.files("./grass")
+for (i in f){
+  test_image <- image_load(paste("./grass/",i,sep=""),
+                           target_size = target_size)
+  num_pixels <- 224*224
+  pixels_to_change <- round(num_pixels * 0.01)
+  
+  # Generate random pixel indices
+  pixel_indices <- sample(num_pixels, pixels_to_change, replace = FALSE)
+  
+  # Change the color of random pixels
+  for (i in pixel_indices) {
+    row_index <- ceiling(i / dim(image)[2])
+    col_index <- i %% dim(image)[2]
+    if (col_index == 0) col_index <- dim(image)[2]
+    
+    # Generate new color values
+    r <- runif(1, 0, 1)
+    g <- runif(1, 0, 1)
+    b <- runif(1, 0, 1)
+    
+    # Change the color of the pixel
+    image[row_index, col_index, ] <- c(r, g, b)
+  }
+
+  x <- image_to_array(test_image)
+  x <- array_reshape(x, c(1, dim(x)))
+  x <- x/255
+  pred <- model %>% predict(x)
+  if (pred[1,2] < 0.50){
+    res <- rbind(res, data.frame(file = i, class = "not_grass", percent_dandelion = pred[1,1], percent_grass = 1- pred[1,1]))
+  } else {
+    res <- rbind(res, data.frame(file = i, class = "grass", percent_dandelion = pred[1,1], percent_grass = 1 - pred[1,1]))
+  }
+}
